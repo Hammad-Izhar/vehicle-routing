@@ -1,5 +1,5 @@
 [package]
-name = "vehicle-routing"
+name = "vehicle_routing"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,3 +8,7 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.4", features = ["derive"] }
 ordered-float = "4.2.0"
+
+[lib]
+name = "vehicle_routing"
+path = "src/vehicle_routing.rs"
