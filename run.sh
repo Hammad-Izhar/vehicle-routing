@@ -13,4 +13,4 @@ fi
 input=$1
 
 # Update this file with instructions on how to run your code given an input
-./target/release/solver $input
+./target/release/vrp_solver $input
