@@ -18,6 +18,8 @@ struct Args {
 }
 
 fn main() {
+    env_logger::init();
+
     let args = Args::parse();
     let output_file_name = format!(
         "output/vrp/{}",

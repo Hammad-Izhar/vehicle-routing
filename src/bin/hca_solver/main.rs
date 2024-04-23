@@ -17,6 +17,8 @@ struct Args {
 }
 
 fn main() {
+    env_logger::init();
+
     let args = Args::parse();
 
     let problem = hca::HealthcareAnalyticsProblem::from_file(&args.input).unwrap();
