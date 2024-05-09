@@ -1,6 +1,7 @@
 use std::{io::Write, time::Duration};
 
 use crate::graph::VehicleRoutingGraph;
+use log::{info, trace};
 use ordered_float::OrderedFloat;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -98,8 +99,11 @@ impl VehicleRoutingProblem {
     /// LP Formulation:
     ///     TBD!
     pub fn solve(&self, timeout: Option<Duration>) -> VehicleRoutingSolution {
+        // Step 1: Compute the minimum spanning tree of the graph
+        let start_time = std::time::Instant::now();
         let mst = self.graph.mst();
 
+        // Step 2: Find the set of vertices with odd degree in the minimum spanning tree
         let mut client_degrees = vec![0; self.number_of_customers];
         for edge in &mst {
             client_degrees[edge.first.id] += 1;
@@ -108,18 +112,38 @@ impl VehicleRoutingProblem {
 
         let odd_degree_clients = client_degrees
             .iter()
-            .filter(|d| **d % 2 == 1)
-            .map(|d| self.graph.clients[*d].clone())
+            .enumerate()
+            .filter(|(_, d)| **d % 2 == 1)
+            .map(|(client_id, _)| self.graph.clients[client_id].clone())
             .collect::<Vec<Client>>();
 
         // By the handshaking lemma, the number of vertices with odd degree must be even
         assert!(odd_degree_clients.len() % 2 == 0);
+        info!("Computing MST took: {:?}", start_time.elapsed());
 
+        trace!(
+            "Odd Degree Clients: {:?}",
+            odd_degree_clients
+                .iter()
+                .map(|c| c.id)
+                .collect::<Vec<usize>>()
+        );
+
+        // Step 3: Compute the minimum weight perfect matching of the odd degree vertices
+        let start_time = std::time::Instant::now();
         let matching = self.graph.find_minimum_weight_matching(&odd_degree_clients);
+        info!("Blossom Algorithm took: {:?}", start_time.elapsed());
 
+        // Step 4: Add the minimum weight perfect matching to the minimum spanning tree
+        // Step 5: Find an Eulerian tour of the graph
+        let start_time = std::time::Instant::now();
         let eulerian_tour = self.graph.find_eulerian_tour(&mst, &matching);
+        info!("Computing Eulerian Tour took: {:?}", start_time.elapsed());
 
+        // Step 6: Convert the Eulerian tour into a TSP by skipping repeated vertices
+        let start_time = std::time::Instant::now();
         let tsp = self.graph.convert_eulerian_tour_to_tsp(&eulerian_tour);
+        info!("Shortcutting took: {:?}", start_time.elapsed());
 
         unimplemented!("Coming soon!");
     }

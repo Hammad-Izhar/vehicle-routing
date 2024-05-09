@@ -1,5 +1,9 @@
+use std::collections::HashMap;
 use std::{cmp::Reverse, collections::HashSet};
 
+use blossom::graph::AnnotatedGraph;
+use log::trace;
+use ordered_float::OrderedFloat;
 use priority_queue::priority_queue::PriorityQueue;
 
 use crate::unordered_pair::UnorderedPair;
@@ -8,7 +12,7 @@ use crate::vrp::Client;
 #[derive(Debug)]
 pub struct VehicleRoutingGraph {
     pub clients: Vec<Client>,
-    pub distance_matrix: Vec<Vec<ordered_float::OrderedFloat<f64>>>,
+    pub distance_matrix: Vec<Vec<OrderedFloat<f64>>>,
 }
 
 impl VehicleRoutingGraph {
@@ -99,8 +103,44 @@ impl VehicleRoutingGraph {
         tree
     }
 
+    /// Computes the minimum weight matching of a subset of clients using the Blossom Algorithm
+    ///
+    /// Currently implemented using a package
+    ///
+    /// Future Work:
+    ///    - Implement the Blossom Algorithm from scratch
+    ///    - Implement Parallel/Distributed Blossom Algorithm
     pub fn find_minimum_weight_matching(&self, subset: &[Client]) -> Vec<UnorderedPair<&Client>> {
-        unimplemented!("Coming soon!");
+        trace!(
+            "Finding minimum weight matching for {} clients",
+            subset.len()
+        );
+        let mut edges = HashMap::new();
+        for client in subset.iter() {
+            let incident_edges: Vec<usize> = subset
+                .iter()
+                .filter(|c| *c != client)
+                .map(|c| c.id)
+                .collect::<Vec<usize>>();
+            let incident_weights = subset
+                .iter()
+                .filter(|c| *c != client)
+                .map(|c| self.distance_matrix[client.id][c.id].into())
+                .collect::<Vec<f64>>();
+            edges.insert(client.id, (incident_edges, incident_weights));
+        }
+
+        let graph = AnnotatedGraph::new(edges);
+
+        let matching = graph
+            .maximin_matching()
+            .expect("Unable to find perfect matching");
+
+        matching
+            .edges()
+            .iter()
+            .map(|(u, v)| UnorderedPair::new(&self.clients[*u], &self.clients[*v]))
+            .collect::<Vec<UnorderedPair<&Client>>>()
     }
 
     pub fn find_eulerian_tour(
