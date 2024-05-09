@@ -1,4 +1,5 @@
 mod graph;
+mod unordered_pair;
 mod vrp;
 
 use std::{path::Path, time::Duration};
@@ -32,8 +33,12 @@ fn main() {
             + ".sol"
     );
 
+    // time this code
+    let now = std::time::Instant::now();
     let problem = vrp::VehicleRoutingProblem::from_file(&args.input).unwrap();
+    println!("Problem loaded in {:?}", now.elapsed());
     let solution = problem.solve(args.timeout.map(Duration::from_secs));
+    println!("Solution computed in {:?}", now.elapsed());
     solution.to_file(&output_file_name).unwrap();
     println!("{}", solution);
 }

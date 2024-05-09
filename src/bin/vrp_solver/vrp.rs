@@ -3,7 +3,7 @@ use std::{io::Write, time::Duration};
 use crate::graph::VehicleRoutingGraph;
 use ordered_float::OrderedFloat;
 
-#[derive(Debug, PartialEq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Client {
     pub id: usize,
     pub x: OrderedFloat<f64>,
@@ -29,8 +29,20 @@ pub struct VehicleRoutingSolution {
 }
 
 impl Client {
-    fn new(id: usize, x: OrderedFloat<f64>, y: OrderedFloat<f64>, demand: u32) -> Self {
+    pub fn new(id: usize, x: OrderedFloat<f64>, y: OrderedFloat<f64>, demand: u32) -> Self {
         Client { id, x, y, demand }
+    }
+}
+
+impl PartialOrd for Client {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.id.partial_cmp(&other.id)
+    }
+}
+
+impl Ord for Client {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.id.cmp(&other.id)
     }
 }
 
@@ -72,7 +84,43 @@ impl VehicleRoutingProblem {
         })
     }
 
+    /// Use the Christofides algorithm to find an inital feasible solution
+    /// Followed by a local search/branch-and-bound algorithm to improve the solution
+    ///
+    /// Chistofides Algorithm:
+    ///    1. Compute the minimum spanning tree of the graph
+    ///    2. Find the set of vertices with odd degree in the minimum spanning tree
+    ///    3. Compute the minimum weight perfect matching of the odd degree vertices
+    ///    4. Add the minimum weight perfect matching to the minimum spanning tree
+    ///    5. Find an Eulerian tour of the graph
+    ///    6. Convert the Eulerian tour into a TSP by skipping repeated vertices
+    ///
+    /// LP Formulation:
+    ///     TBD!
     pub fn solve(&self, timeout: Option<Duration>) -> VehicleRoutingSolution {
+        let mst = self.graph.mst();
+
+        let mut client_degrees = vec![0; self.number_of_customers];
+        for edge in &mst {
+            client_degrees[edge.first.id] += 1;
+            client_degrees[edge.second.id] += 1;
+        }
+
+        let odd_degree_clients = client_degrees
+            .iter()
+            .filter(|d| **d % 2 == 1)
+            .map(|d| self.graph.clients[*d].clone())
+            .collect::<Vec<Client>>();
+
+        // By the handshaking lemma, the number of vertices with odd degree must be even
+        assert!(odd_degree_clients.len() % 2 == 0);
+
+        let matching = self.graph.find_minimum_weight_matching(&odd_degree_clients);
+
+        let eulerian_tour = self.graph.find_eulerian_tour(&mst, &matching);
+
+        let tsp = self.graph.convert_eulerian_tour_to_tsp(&eulerian_tour);
+
         unimplemented!("Coming soon!");
     }
 }
