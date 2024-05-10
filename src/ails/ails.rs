@@ -1,8 +1,9 @@
-use std::collections::HashSet;
+use std::time::Instant;
 
+use log::trace;
 use rand::seq::SliceRandom;
 
-use crate::ails::vrp::problem::VehicleRoutingProblem;
+use crate::ails::vrp::{problem::VehicleRoutingProblem, routing_plan::InsertionHeuristic};
 
 use super::vrp::routing_plan::RoutingPlan;
 
@@ -20,7 +21,7 @@ struct AILS {
 
 impl AILS {
     pub fn new(instance: VehicleRoutingProblem) -> Self {
-        let routing_plan = find_initial_solution(&instance);
+        let routing_plan = Self::find_initial_solution(&instance);
 
         Self {
             phase: AILSPhase::PhaseOne,
@@ -30,7 +31,25 @@ impl AILS {
         }
     }
 
-    pub fn run(&mut self) {}
+    pub fn run(&mut self, intial_solution: Option<RoutingPlan>, timeout: Instant) -> RoutingPlan {
+        let initial_solution =
+            intial_solution.unwrap_or_else(|| Self::find_initial_solution(&self.instance));
+
+        self.reference_solution = initial_solution.clone();
+        self.optimal_solution = initial_solution.clone();
+
+        while timeout.elapsed().as_secs() < 290 {
+            let new_value = self.reference_solution.local_search(&self.instance);
+
+            trace!("New value: {}", new_value);
+
+            if new_value < self.optimal_solution.value(&self.instance) {
+                self.optimal_solution = self.reference_solution.clone();
+            }
+        }
+
+        return self.optimal_solution.clone();
+    }
 
     fn find_initial_solution(instance: &VehicleRoutingProblem) -> RoutingPlan {
         let total_demand = (0..instance.number_of_customers)
@@ -38,6 +57,7 @@ impl AILS {
             .sum::<u32>();
         let number_of_routes =
             ((total_demand + instance.vehicle_capacity - 1) / instance.vehicle_capacity) as usize;
+        assert_eq!(number_of_routes, instance.number_of_vehicles);
 
         let mut clients = (0..instance.number_of_customers).collect::<Vec<_>>();
         let mut routes = vec![vec![]; number_of_routes];
@@ -52,10 +72,10 @@ impl AILS {
             route.push(client);
         }
 
-        let routing_plan = RoutingPlan::new(routes);
+        let mut routing_plan = RoutingPlan::new(routes);
 
         for client in clients {
-            routing_plan.insert()
+            routing_plan.insert(instance, client, InsertionHeuristic::Distance)
         }
 
         routing_plan
