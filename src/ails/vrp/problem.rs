@@ -2,10 +2,13 @@ use std::time::Duration;
 
 use ordered_float::OrderedFloat;
 
+use crate::ails::ails::AILS;
 use crate::ails::vrp::client::{Client, ClientId};
 use crate::ails::vrp::graph::VehicleRoutingGraph;
 
 use crate::ails::vrp::solution::VehicleRoutingSolution;
+
+use super::routing_plan::RoutingPlan;
 
 #[derive(Debug)]
 pub struct VehicleRoutingProblem {
@@ -59,6 +62,56 @@ impl VehicleRoutingProblem {
     }
 
     pub fn solve(&self, timeout: Option<Duration>) -> VehicleRoutingSolution {
+        let tsp = self.graph.chirstofides();
+        let initial_routing_plan = self.partition_tour(tsp).unwrap();
+
+        let mut ails = AILS::new();
+
+        ails.run(self, Some(initial_routing_plan), std::time::Instant::now());
+
         unimplemented!()
+    }
+
+    fn partition_tour(&self, tour: Vec<ClientId>) -> Option<RoutingPlan> {
+        let mut best_partition = None;
+        let mut tour_without_depot = tour[1..tour.len() - 1].to_vec();
+
+        for _ in 0..tour_without_depot.len() {
+            let mut current_partition = vec![vec![]; self.number_of_vehicles];
+            let mut partition_demands = vec![0; self.number_of_vehicles];
+
+            for client in &tour_without_depot {
+                for (vehicle_route, demand) in current_partition
+                    .iter_mut()
+                    .zip(partition_demands.iter_mut())
+                {
+                    if *demand + self.demand(*client) <= self.vehicle_capacity {
+                        vehicle_route.push(*client);
+                        *demand += self.demand(*client);
+                        break;
+                    }
+                }
+            }
+
+            let partition = RoutingPlan::new(current_partition);
+            if let Err(_) = partition.feasible(self) {
+                continue;
+            }
+
+            best_partition = match best_partition {
+                None => Some(partition),
+                Some(best) => {
+                    if partition.value(self) < best.value(self) {
+                        Some(partition)
+                    } else {
+                        Some(best)
+                    }
+                }
+            };
+
+            tour_without_depot.rotate_left(1);
+        }
+
+        best_partition
     }
 }

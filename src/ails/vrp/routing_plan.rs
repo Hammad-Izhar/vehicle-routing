@@ -53,16 +53,17 @@ impl RoutingPlan {
     }
 
     pub fn value(&self, instance: &VehicleRoutingProblem) -> f64 {
-        self.routes
-            .iter()
-            .map(|route| {
-                route
-                    .iter()
-                    .zip(route.iter().skip(1))
-                    .map(|(&client1, &client2)| instance.graph.distance(client1, client2))
-                    .sum::<f64>()
-            })
-            .sum()
+        let mut total_distance = 0.0;
+        for route in &self.routes {
+            for (i, client) in route.iter().enumerate() {
+                let prev_client = if i == 0 { 0 } else { route[i - 1] };
+
+                total_distance += instance.graph.distance(*client, prev_client);
+            }
+            total_distance += instance.graph.distance(*route.last().unwrap(), 0);
+        }
+
+        total_distance
     }
 
     pub fn local_search(&mut self, instance: &VehicleRoutingProblem) -> f64 {

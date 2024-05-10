@@ -12,43 +12,36 @@ pub enum AILSPhase {
     PhaseTwo,
 }
 
-struct AILS {
-    phase: AILSPhase,
-    instance: VehicleRoutingProblem,
-    optimal_solution: RoutingPlan,
-    reference_solution: RoutingPlan,
-}
+pub struct AILS {}
 
 impl AILS {
-    pub fn new(instance: VehicleRoutingProblem) -> Self {
-        let routing_plan = Self::find_initial_solution(&instance);
-
-        Self {
-            phase: AILSPhase::PhaseOne,
-            instance,
-            optimal_solution: routing_plan.clone(),
-            reference_solution: routing_plan,
-        }
+    pub fn new() -> Self {
+        Self {}
     }
 
-    pub fn run(&mut self, intial_solution: Option<RoutingPlan>, timeout: Instant) -> RoutingPlan {
+    pub fn run(
+        &mut self,
+        instance: &VehicleRoutingProblem,
+        intial_solution: Option<RoutingPlan>,
+        timeout: Instant,
+    ) -> RoutingPlan {
         let initial_solution =
-            intial_solution.unwrap_or_else(|| Self::find_initial_solution(&self.instance));
+            intial_solution.unwrap_or_else(|| Self::find_initial_solution(instance));
 
-        self.reference_solution = initial_solution.clone();
-        self.optimal_solution = initial_solution.clone();
+        let mut reference_solution = initial_solution.clone();
+        let mut optimal_solution = initial_solution.clone();
 
         while timeout.elapsed().as_secs() < 290 {
-            let new_value = self.reference_solution.local_search(&self.instance);
+            let new_value = reference_solution.local_search(instance);
 
             trace!("New value: {}", new_value);
 
-            if new_value < self.optimal_solution.value(&self.instance) {
-                self.optimal_solution = self.reference_solution.clone();
+            if new_value < optimal_solution.value(instance) {
+                optimal_solution = reference_solution.clone();
             }
         }
 
-        return self.optimal_solution.clone();
+        return optimal_solution.clone();
     }
 
     fn find_initial_solution(instance: &VehicleRoutingProblem) -> RoutingPlan {
