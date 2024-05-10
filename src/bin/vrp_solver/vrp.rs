@@ -180,14 +180,6 @@ impl VehicleRoutingProblem {
                 })
                 .sum::<OrderedFloat<f64>>();
 
-            trace!(
-                "{:?}",
-                current_partition
-                    .iter()
-                    .map(|route| route.iter().map(|c| c.demand).sum())
-                    .collect::<Vec<u32>>()
-            );
-
             best_partition = match best_partition {
                 Some((_, best_cost)) => {
                     if current_partition_cost < best_cost {
