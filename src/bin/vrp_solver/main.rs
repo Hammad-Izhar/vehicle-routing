@@ -2,6 +2,7 @@ use std::{path::Path, time::Duration};
 
 use clap::Parser;
 use log::info;
+use vehicle_routing::ails::vrp::problem::VehicleRoutingProblem;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -32,7 +33,7 @@ fn main() {
 
     // time this code
     let now = std::time::Instant::now();
-    let problem = vrp::VehicleRoutingProblem::from_file(&args.input).unwrap();
+    let problem = VehicleRoutingProblem::from_file(&args.input).unwrap();
     info!("Problem loaded in {:?}", now.elapsed());
     let solution = problem.solve(args.timeout.map(Duration::from_secs));
     info!("Solution computed in {:?}", now.elapsed());

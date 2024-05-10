@@ -4,7 +4,7 @@ use std::{
 };
 
 use blossom::graph::AnnotatedGraph;
-use log::{info, trace};
+use log::trace;
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
 use rand::Rng;

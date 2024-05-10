@@ -13,7 +13,7 @@ impl std::fmt::Display for VehicleRoutingSolution {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "{{\"Instance\": {}, \"Time\": {:2}, \"Result\": {}, \"Solution\": {}}}",
+            "{{\"Instance\": {}, \"Time\": {:.2}, \"Result\": {}, \"Solution\": {}}}",
             self.instance_name,
             self.compute_time.as_secs_f64(),
             self.cost,
@@ -21,14 +21,15 @@ impl std::fmt::Display for VehicleRoutingSolution {
                 .iter()
                 .map(|route| format!(
                     "{}",
-                    route
-                        .iter()
+                    [0].iter()
+                        .chain(route)
+                        .chain([&0])
                         .map(|c| c.to_string())
                         .collect::<Vec<String>>()
                         .join(" ")
                 ))
                 .collect::<Vec<String>>()
-                .join("\n")
+                .join(" ")
         )
     }
 }
@@ -43,8 +44,9 @@ impl VehicleRoutingSolution {
             output.write(
                 format!(
                     "{}\n",
-                    route
-                        .iter()
+                    [0].iter()
+                        .chain(route)
+                        .chain([&0])
                         .map(|c| c.to_string())
                         .collect::<Vec<String>>()
                         .join(" ")

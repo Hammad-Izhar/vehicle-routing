@@ -31,12 +31,11 @@ impl AILS {
         let mut reference_solution = initial_solution.clone();
         let mut optimal_solution = initial_solution.clone();
 
-        while timeout.elapsed().as_secs() < 290 {
+        while timeout.elapsed().as_secs() < 2 {
             let new_value = reference_solution.local_search(instance);
 
-            trace!("New value: {}", new_value);
-
             if new_value < optimal_solution.value(instance) {
+                trace!("Found new optimal: {}", new_value);
                 optimal_solution = reference_solution.clone();
             }
         }

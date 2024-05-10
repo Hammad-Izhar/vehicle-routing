@@ -60,7 +60,9 @@ impl RoutingPlan {
 
                 total_distance += instance.graph.distance(*client, prev_client);
             }
-            total_distance += instance.graph.distance(*route.last().unwrap(), 0);
+            if route.len() > 0 {
+                total_distance += instance.graph.distance(*route.last().unwrap(), 0);
+            }
         }
 
         total_distance
@@ -68,17 +70,16 @@ impl RoutingPlan {
 
     pub fn local_search(&mut self, instance: &VehicleRoutingProblem) -> f64 {
         let strategy = [
-            SearchStrategy::InterShift,
+            // SearchStrategy::InterShift,
             SearchStrategy::InterSwap,
-            SearchStrategy::IntraShift,
-            SearchStrategy::IntraSwap,
+            // SearchStrategy::IntraShift,
+            // SearchStrategy::IntraSwap,
         ]
         .choose(&mut rand::thread_rng())
         .unwrap();
 
         match strategy {
             SearchStrategy::InterShift => {
-                trace!("Modifying route using InterShift");
                 let client = self
                     .routes
                     .iter()
@@ -88,7 +89,6 @@ impl RoutingPlan {
                 self.inter_shift(instance, *client);
             }
             SearchStrategy::InterSwap => {
-                trace!("Modifying route using InterSwap");
                 let client1 = self
                     .routes
                     .iter()
@@ -104,7 +104,6 @@ impl RoutingPlan {
                 self.inter_swap(instance, *client1, *client2);
             }
             SearchStrategy::IntraShift => {
-                trace!("Modifying route using IntraShift");
                 let client = self
                     .routes
                     .iter()
@@ -114,7 +113,6 @@ impl RoutingPlan {
                 self.intra_shift(instance, *client);
             }
             SearchStrategy::IntraSwap => {
-                trace!("Modifying route using IntraSwap");
                 let client1 = self
                     .routes
                     .iter()
@@ -273,7 +271,7 @@ impl RoutingPlan {
             return;
         }
 
-        let (best_index, best_cost) = self.lowest_cost_position(instance, client, random_route);
+        let (best_index, _) = self.lowest_cost_position(instance, client, random_route);
         self.routes[random_route].insert(best_index, client);
     }
 
