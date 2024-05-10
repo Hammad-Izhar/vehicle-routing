@@ -4,7 +4,7 @@ use crate::graph::VehicleRoutingGraph;
 use log::{info, trace};
 use ordered_float::OrderedFloat;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Client {
     pub id: usize,
     pub x: OrderedFloat<f64>,
@@ -85,20 +85,7 @@ impl VehicleRoutingProblem {
         })
     }
 
-    /// Use the Christofides algorithm to find an inital feasible solution
-    /// Followed by a local search/branch-and-bound algorithm to improve the solution
-    ///
-    /// Chistofides Algorithm:
-    ///    1. Compute the minimum spanning tree of the graph
-    ///    2. Find the set of vertices with odd degree in the minimum spanning tree
-    ///    3. Compute the minimum weight perfect matching of the odd degree vertices
-    ///    4. Add the minimum weight perfect matching to the minimum spanning tree
-    ///    5. Find an Eulerian tour of the graph
-    ///    6. Convert the Eulerian tour into a TSP by skipping repeated vertices
-    ///
-    /// LP Formulation:
-    ///     TBD!
-    pub fn solve(&self, timeout: Option<Duration>) -> VehicleRoutingSolution {
+    fn christofides(&self) -> (Vec<Client>, f64) {
         // Step 1: Compute the minimum spanning tree of the graph
         let start_time = std::time::Instant::now();
         let mst = self.graph.mst();
@@ -122,11 +109,8 @@ impl VehicleRoutingProblem {
         info!("Computing MST took: {:?}", start_time.elapsed());
 
         trace!(
-            "Odd Degree Clients: {:?}",
-            odd_degree_clients
-                .iter()
-                .map(|c| c.id)
-                .collect::<Vec<usize>>()
+            "A total of {} clients have odd degree in the MST",
+            odd_degree_clients.len()
         );
 
         // Step 3: Compute the minimum weight perfect matching of the odd degree vertices
@@ -137,15 +121,125 @@ impl VehicleRoutingProblem {
         // Step 4: Add the minimum weight perfect matching to the minimum spanning tree
         // Step 5: Find an Eulerian tour of the graph
         let start_time = std::time::Instant::now();
-        let eulerian_tour = self.graph.find_eulerian_tour(&mst, &matching);
+        let eulerian_tour = VehicleRoutingGraph::find_eulerian_tour(&mst, &matching);
         info!("Computing Eulerian Tour took: {:?}", start_time.elapsed());
 
         // Step 6: Convert the Eulerian tour into a TSP by skipping repeated vertices
         let start_time = std::time::Instant::now();
-        let tsp = self.graph.convert_eulerian_tour_to_tsp(&eulerian_tour);
+        let (tsp, tsp_weight) = self.graph.convert_eulerian_tour_to_tsp(&eulerian_tour);
         info!("Shortcutting took: {:?}", start_time.elapsed());
 
-        unimplemented!("Coming soon!");
+        return (tsp, tsp_weight.into());
+    }
+
+    fn partition_tour(&self, tour: Vec<Client>) -> Option<(Vec<Vec<Client>>, f64)> {
+        let mut best_partition = None;
+        let mut current_partition = Vec::new();
+
+        let depot = &tour[0];
+        let mut tour_without_depot = tour[1..tour.len() - 1].to_vec();
+
+        for _ in 0..tour_without_depot.len() {
+            let mut current_route = vec![*depot];
+            let mut current_route_demand = 0;
+
+            for client in &tour_without_depot {
+                if current_route_demand + client.demand > self.vehicle_capacity {
+                    current_route.push(*depot);
+
+                    current_partition.push(current_route.clone());
+
+                    current_route = vec![*depot, *client];
+                    current_route_demand = client.demand;
+                } else {
+                    current_route.push(*client);
+                    current_route_demand += client.demand;
+                }
+            }
+
+            if current_route.len() > 1 {
+                current_route.push(*depot);
+                current_partition.push(current_route.clone());
+            }
+
+            let current_partition_cost = current_partition
+                .iter()
+                .map(|route| {
+                    route
+                        .windows(2)
+                        .map(|pair| self.graph.distance_matrix[pair[0].id][pair[1].id])
+                        .sum::<OrderedFloat<f64>>()
+                })
+                .sum::<OrderedFloat<f64>>();
+
+            trace!(
+                "{:?}",
+                current_partition
+                    .iter()
+                    .map(|route| route.iter().map(|c| c.demand).sum())
+                    .collect::<Vec<u32>>()
+            );
+
+            trace!("partition length: {:?}", current_partition.len());
+
+            if current_partition.len() > self.number_of_vehicles {
+                current_partition = Vec::new();
+                continue;
+            }
+
+            best_partition = match best_partition {
+                Some((_, best_cost)) => {
+                    if current_partition_cost < best_cost {
+                        Some((current_partition.clone(), current_partition_cost))
+                    } else {
+                        best_partition
+                    }
+                }
+                None => Some((current_partition.clone(), current_partition_cost)),
+            };
+
+            current_partition = Vec::new();
+            tour_without_depot.rotate_left(1);
+        }
+
+        return best_partition.map(|(partition, cost)| (partition, cost.into()));
+    }
+
+    /// Use the Christofides algorithm to find an inital feasible solution
+    /// Followed by a local search/branch-and-bound algorithm to improve the solution
+    ///
+    /// Chistofides Algorithm:
+    ///    1. Compute the minimum spanning tree of the graph
+    ///    2. Find the set of vertices with odd degree in the minimum spanning tree
+    ///    3. Compute the minimum weight perfect matching of the odd degree vertices
+    ///    4. Add the minimum weight perfect matching to the minimum spanning tree
+    ///    5. Find an Eulerian tour of the graph
+    ///    6. Convert the Eulerian tour into a TSP by skipping repeated vertices
+    ///
+    /// LP Formulation:
+    ///     TBD!
+    pub fn solve(&self, timeout: Option<Duration>) -> VehicleRoutingSolution {
+        let start_time = std::time::Instant::now();
+        let (tsp, tsp_weight) = self.christofides();
+        info!("Christofides took: {:?}", start_time.elapsed());
+
+        let start_time = std::time::Instant::now();
+        let (best_partition, best_partition_cost) =
+            self.partition_tour(tsp).map_or((vec![], 0.0), |x| x);
+        info!("Partitioning took: {:?}", start_time.elapsed());
+
+        // TODO: Implement a local search algorithm or branch and bound to improve the solution
+
+        VehicleRoutingSolution {
+            instance_name: self.instance_name.clone(),
+            compute_time: timeout.unwrap_or(Duration::from_secs(0)),
+            is_optimal: false,
+            cost: best_partition_cost,
+            routes: best_partition
+                .iter()
+                .map(|route| route.iter().map(|c| c.id).collect())
+                .collect(),
+        }
     }
 }
 

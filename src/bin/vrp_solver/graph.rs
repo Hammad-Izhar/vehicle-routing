@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::{cmp::Reverse, collections::HashSet};
 
 use blossom::graph::AnnotatedGraph;
+use clarabel::solver::DefaultProblemData;
 use log::trace;
 use ordered_float::OrderedFloat;
 use priority_queue::priority_queue::PriorityQueue;
@@ -18,8 +19,8 @@ pub struct VehicleRoutingGraph {
 impl VehicleRoutingGraph {
     pub fn new(clients: &[Client]) -> Self {
         let mut distance_matrix = vec![vec![0.0.into(); clients.len()]; clients.len()];
-        for client in clients.iter() {
-            for other_client in clients.iter() {
+        for client in clients {
+            for other_client in clients {
                 let distance = ((client.x - other_client.x).powi(2)
                     + (client.y - other_client.y).powi(2))
                 .sqrt();
@@ -143,16 +144,87 @@ impl VehicleRoutingGraph {
             .collect::<Vec<UnorderedPair<&Client>>>()
     }
 
-    pub fn find_eulerian_tour(
-        &self,
-        mst: &[UnorderedPair<&Client>],
-        matching: &[UnorderedPair<&Client>],
-    ) -> Vec<&Client> {
-        unimplemented!("Coming soon!");
+    /// Computes an Eulerian tour of the multigraph formed by the minimum spanning tree and the minimum weight matching
+    ///
+    /// Heirholzer's Algorithm:
+    ///    1. Start at any vertex
+    ///    2. Follow a trail of edges from that vertex until returning to the vertex
+    ///    3. It is not possible to get stuck at any vertex other than the starting vertex
+    ///    4. If all edges have been visited, the tour is done
+    ///    5. Otherwise, choose a vertex in the tour with unused edges and start a new trail from that vertex
+    ///
+    pub fn find_eulerian_tour<'a>(
+        mst: &[UnorderedPair<&'a Client>],
+        matching: &[UnorderedPair<&'a Client>],
+    ) -> Vec<&'a Client> {
+        let mut vertex_to_edges = HashMap::new();
+        for edge in mst.iter().chain(matching.iter()) {
+            vertex_to_edges
+                .entry(edge.first)
+                .or_insert_with(HashSet::new)
+                .insert(edge);
+            vertex_to_edges
+                .entry(edge.second)
+                .or_insert_with(HashSet::new)
+                .insert(edge);
+        }
+
+        let mut eulerian_tour = Vec::new();
+        let mut stack = vec![mst.first().unwrap().first];
+
+        while !stack.is_empty() {
+            let current_vertex = stack.last().unwrap();
+            let edges = vertex_to_edges
+                .get_mut(current_vertex)
+                .expect("Unable to lookup vertex in edge hashmap");
+            if edges.is_empty() {
+                eulerian_tour.push(stack.pop().unwrap());
+            } else {
+                let edge = *edges.iter().next().unwrap();
+                let next_vertex = if edge.first == *current_vertex {
+                    edge.second
+                } else {
+                    edge.first
+                };
+
+                edges.remove(edge);
+                vertex_to_edges.get_mut(&next_vertex).unwrap().remove(edge);
+                stack.push(next_vertex);
+            }
+        }
+
+        // Rotate the cycle so that the depot is the first and last vertex
+        let depot_index = eulerian_tour
+            .iter()
+            .position(|client| client.id == 0)
+            .expect("Unable to find the depot in the Eulerian tour");
+        eulerian_tour.rotate_left(depot_index);
+
+        eulerian_tour
     }
 
-    pub fn convert_eulerian_tour_to_tsp(&self, eulerian_tour: &[&Client]) -> Vec<&Client> {
-        unimplemented!("Coming soon!");
+    pub fn convert_eulerian_tour_to_tsp<'a>(
+        &self,
+        eulerian_tour: &'a [&'a Client],
+    ) -> (Vec<Client>, OrderedFloat<f64>) {
+        let mut visited = HashSet::new();
+        let mut tsp = Vec::new();
+        let mut weight = 0.0.into();
+
+        for client in eulerian_tour {
+            if !visited.contains(*client) {
+                tsp.push(**client);
+                visited.insert(*client);
+                if let Some(last_client) = tsp.last() {
+                    weight += self.distance_matrix[last_client.id][client.id];
+                }
+            }
+        }
+
+        tsp.push(*eulerian_tour[0]);
+        weight += self.distance_matrix[tsp.last().unwrap().id][tsp.first().unwrap().id];
+
+        (tsp, weight)
     }
 }
 
@@ -179,5 +251,38 @@ mod tests {
         assert!(mst.contains(&UnorderedPair::new(&clients[0], &clients[5])));
         assert!(mst.contains(&UnorderedPair::new(&clients[1], &clients[2])));
         assert!(mst.contains(&UnorderedPair::new(&clients[3], &clients[4])));
+    }
+
+    #[test]
+    fn test_eulerian_tour() {
+        let clients = vec![
+            Client::new(0, 0.0.into(), 0.0.into(), 0),
+            Client::new(1, 0.0.into(), 7.0.into(), 0),
+            Client::new(2, 3.0.into(), 4.0.into(), 0),
+            Client::new(3, 7.0.into(), (-10.0).into(), 0),
+            Client::new(4, (-4.0).into(), (-6.0).into(), 0),
+            Client::new(5, (-4.0).into(), 3.0.into(), 0),
+        ];
+
+        let mst: Vec<UnorderedPair<&Client>> = vec![
+            UnorderedPair::new(&clients[0], &clients[2]),
+            UnorderedPair::new(&clients[0], &clients[4]),
+            UnorderedPair::new(&clients[1], &clients[2]),
+            UnorderedPair::new(&clients[1], &clients[5]),
+            UnorderedPair::new(&clients[3], &clients[4]),
+            UnorderedPair::new(&clients[3], &clients[5]),
+        ];
+
+        let tour = VehicleRoutingGraph::find_eulerian_tour(&mst, &[]);
+
+        println!("{:?}", tour);
+
+        assert_eq!(tour.len(), mst.len() + 1);
+        assert_eq!(tour.first().unwrap().id, 0);
+        let mut current_vertex = tour.first().unwrap();
+        for next_vertex in tour.iter().skip(1) {
+            assert!(mst.contains(&UnorderedPair::new(current_vertex, next_vertex)));
+            current_vertex = next_vertex;
+        }
     }
 }
