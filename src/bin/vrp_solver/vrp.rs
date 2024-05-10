@@ -134,32 +134,40 @@ impl VehicleRoutingProblem {
 
     fn partition_tour(&self, tour: Vec<Client>) -> Option<(Vec<Vec<Client>>, f64)> {
         let mut best_partition = None;
-        let mut current_partition = Vec::new();
 
         let depot = &tour[0];
         let mut tour_without_depot = tour[1..tour.len() - 1].to_vec();
 
         for _ in 0..tour_without_depot.len() {
-            let mut current_route = vec![*depot];
-            let mut current_route_demand = 0;
+            let mut current_partition = vec![vec![]; self.number_of_vehicles];
+            let mut partition_demands = vec![0; self.number_of_vehicles];
 
             for client in &tour_without_depot {
-                if current_route_demand + client.demand > self.vehicle_capacity {
-                    current_route.push(*depot);
-
-                    current_partition.push(current_route.clone());
-
-                    current_route = vec![*depot, *client];
-                    current_route_demand = client.demand;
-                } else {
-                    current_route.push(*client);
-                    current_route_demand += client.demand;
+                for (vehicle_route, demand) in current_partition
+                    .iter_mut()
+                    .zip(partition_demands.iter_mut())
+                {
+                    if *demand + client.demand <= self.vehicle_capacity {
+                        vehicle_route.push(*client);
+                        *demand += client.demand;
+                        break;
+                    }
                 }
             }
 
-            if current_route.len() > 1 {
-                current_route.push(*depot);
-                current_partition.push(current_route.clone());
+            let clients_visited = current_partition
+                .iter()
+                .flatten()
+                .collect::<Vec<&Client>>()
+                .len();
+
+            if clients_visited != self.number_of_customers - 1 {
+                continue;
+            }
+
+            for route in current_partition.iter_mut() {
+                route.insert(0, *depot);
+                route.push(*depot);
             }
 
             let current_partition_cost = current_partition
@@ -180,13 +188,6 @@ impl VehicleRoutingProblem {
                     .collect::<Vec<u32>>()
             );
 
-            trace!("partition length: {:?}", current_partition.len());
-
-            if current_partition.len() > self.number_of_vehicles {
-                current_partition = Vec::new();
-                continue;
-            }
-
             best_partition = match best_partition {
                 Some((_, best_cost)) => {
                     if current_partition_cost < best_cost {
@@ -198,7 +199,6 @@ impl VehicleRoutingProblem {
                 None => Some((current_partition.clone(), current_partition_cost)),
             };
 
-            current_partition = Vec::new();
             tour_without_depot.rotate_left(1);
         }
 
