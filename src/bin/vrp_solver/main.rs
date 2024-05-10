@@ -1,7 +1,3 @@
-mod graph;
-mod unordered_pair;
-mod vrp;
-
 use std::{path::Path, time::Duration};
 
 use clap::Parser;
