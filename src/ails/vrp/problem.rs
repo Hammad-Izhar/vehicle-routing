@@ -17,10 +17,7 @@ pub struct VehicleRoutingProblem {
 }
 
 impl VehicleRoutingProblem {
-    pub fn from_file(
-        filename: &str,
-        k_nearest: Option<usize>,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_file(filename: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let file_contents = std::fs::read_to_string(filename)?;
         let mut number_of_customers = 0;
         let mut number_of_vehicles = 0;
@@ -53,7 +50,7 @@ impl VehicleRoutingProblem {
             number_of_customers,
             number_of_vehicles,
             vehicle_capacity,
-            graph: VehicleRoutingGraph::new(&clients, k_nearest.unwrap_or(5)),
+            graph: VehicleRoutingGraph::new(&clients),
         })
     }
 

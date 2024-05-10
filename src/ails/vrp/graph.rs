@@ -1,4 +1,6 @@
-use std::collections::HashMap;
+use std::{cmp::min, collections::HashMap};
+
+use rand::Rng;
 
 use crate::ails::vrp::client::Client;
 
@@ -11,7 +13,7 @@ pub struct VehicleRoutingGraph {
 }
 
 impl VehicleRoutingGraph {
-    pub fn new(clients: &[Client], k_nearest: usize) -> Self {
+    pub fn new(clients: &[Client]) -> Self {
         let mut distance_matrix = vec![vec![0.0; clients.len()]; clients.len()];
         for client in clients {
             for other_client in clients {
@@ -24,12 +26,12 @@ impl VehicleRoutingGraph {
 
         let mut closest_clients = HashMap::new();
         for i in 0..clients.len() {
-            let mut distances = (0..clients.len())
+            let mut distances = (1..clients.len())
                 .map(|j| (j, distance_matrix[i][j]))
                 .collect::<Vec<(usize, f64)>>();
             distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-            let nearest_neighbors = distances.iter().take(k_nearest).map(|(j, _)| *j).collect();
-            closest_clients.insert(i, nearest_neighbors);
+            let sorted_neighbors = distances.iter().map(|(j, _)| *j).collect();
+            closest_clients.insert(i, sorted_neighbors);
         }
 
         VehicleRoutingGraph {
@@ -47,7 +49,23 @@ impl VehicleRoutingGraph {
         self.distance(0, client)
     }
 
-    pub fn neighbors(&self, client: ClientId) -> Vec<ClientId> {
-        self.closest_clients[&client].clone()
+    pub fn neighbors(&self, client: ClientId) -> impl Iterator<Item = ClientId> + '_ {
+        self.closest_clients[&client].iter().map(|&n| n)
+    }
+
+    pub fn proximity(&self, client: ClientId, route: &[ClientId], num_routes: usize) -> f64 {
+        let proximity_set = route.iter().map(|&c| {
+            self.closest_clients[&client]
+                .iter()
+                .position(|&n| n == c)
+                .unwrap() as f64
+        });
+
+        let rho = min(
+            route.len() - 2,
+            rand::thread_rng().gen_range(1..=self.clients.len() / num_routes),
+        );
+
+        proximity_set.take(rho).sum::<f64>() / rho as f64
     }
 }

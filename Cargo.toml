@@ -14,6 +14,7 @@ good_lp = { version = "1.8.1", features=["clarabel"], default-features = false }
 log = "0.4.21"
 ordered-float = "4.2.0"
 priority-queue = "2.0.2"
+rand = "0.8.5"
 
 [lib]
 name = "vehicle_routing"
