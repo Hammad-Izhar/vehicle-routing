@@ -65,16 +65,11 @@ impl VehicleRoutingProblem {
     pub fn solve(&self, timeout: Option<Duration>) -> VehicleRoutingSolution {
         let start_time = std::time::Instant::now();
         let tsp = self.graph.chirstofides();
-        let initial_routing_plan = self.partition_tour(tsp).unwrap();
-
-        info!(
-            "Initial Routing Plan Cost: {}",
-            initial_routing_plan.value(self)
-        );
+        let initial_routing_plan = self.partition_tour(tsp);
 
         let mut ails = AILS::new();
 
-        let solution = ails.run(self, Some(initial_routing_plan), std::time::Instant::now());
+        let solution = ails.run(self, initial_routing_plan, std::time::Instant::now());
 
         VehicleRoutingSolution {
             instance_name: self.instance_name.clone(),

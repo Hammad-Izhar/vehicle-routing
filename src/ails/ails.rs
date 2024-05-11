@@ -31,7 +31,7 @@ impl AILS {
         let mut reference_solution = initial_solution.clone();
         let mut optimal_solution = initial_solution.clone();
 
-        while timeout.elapsed().as_secs() < 2 {
+        while timeout.elapsed().as_secs() < 200 {
             let new_value = reference_solution.local_search(instance);
 
             if new_value < optimal_solution.value(instance) {
@@ -44,32 +44,39 @@ impl AILS {
     }
 
     fn find_initial_solution(instance: &VehicleRoutingProblem) -> RoutingPlan {
-        let total_demand = (0..instance.number_of_customers)
-            .map(|client| instance.demand(client))
-            .sum::<u32>();
-        let number_of_routes =
-            ((total_demand + instance.vehicle_capacity - 1) / instance.vehicle_capacity) as usize;
-        assert_eq!(number_of_routes, instance.number_of_vehicles);
+        let mut partition = None;
 
-        let mut clients = (0..instance.number_of_customers).collect::<Vec<_>>();
-        let mut routes = vec![vec![]; number_of_routes];
+        while partition.is_none() {
+            let number_of_routes = instance.number_of_vehicles;
 
-        let random_clients: Vec<usize> = clients
-            .choose_multiple(&mut rand::thread_rng(), number_of_routes)
-            .cloned()
-            .collect();
+            let mut clients = (0..instance.number_of_customers).collect::<Vec<_>>();
+            let mut routes = vec![vec![]; number_of_routes];
+            let mut partition_demands = vec![0; number_of_routes];
 
-        for (route, client) in routes.iter_mut().zip(random_clients) {
-            clients.retain(|&c| c != client);
-            route.push(client);
+            let random_clients: Vec<usize> = clients
+                .choose_multiple(&mut rand::thread_rng(), number_of_routes)
+                .cloned()
+                .collect();
+
+            for (i, (route, client)) in routes.iter_mut().zip(&random_clients).enumerate() {
+                clients.retain(|&c| c != *client);
+                route.push(*client);
+                partition_demands[i] = instance.demand(*client);
+            }
+
+            for client in &random_clients {
+                for (vehicle_route, demand) in routes.iter_mut().zip(partition_demands.iter_mut()) {
+                    if *demand + instance.demand(*client) <= instance.vehicle_capacity {
+                        vehicle_route.push(*client);
+                        *demand += instance.demand(*client);
+                        break;
+                    }
+                }
+            }
+
+            partition = Some(RoutingPlan::new(routes))
         }
 
-        let mut routing_plan = RoutingPlan::new(routes);
-
-        for client in clients {
-            routing_plan.insert(instance, client, InsertionHeuristic::Distance)
-        }
-
-        routing_plan
+        partition.unwrap()
     }
 }

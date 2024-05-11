@@ -11,7 +11,7 @@ pub struct VehicleRoutingSolution {
 
 impl std::fmt::Display for VehicleRoutingSolution {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
+        write!(
             f,
             "{{\"Instance\": {}, \"Time\": {:.2}, \"Result\": {}, \"Solution\": {}}}",
             self.instance_name,

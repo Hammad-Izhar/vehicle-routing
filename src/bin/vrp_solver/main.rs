@@ -31,7 +31,6 @@ fn main() {
             + ".sol"
     );
 
-    // time this code
     let now = std::time::Instant::now();
     let problem = VehicleRoutingProblem::from_file(&args.input).unwrap();
     info!("Problem loaded in {:?}", now.elapsed());
