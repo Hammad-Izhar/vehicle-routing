@@ -13,7 +13,7 @@ impl std::fmt::Display for VehicleRoutingSolution {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{{\"Instance\": \"{}\", \"Time\": \"{:.2}\", \"Result\": {:.2}, \"Solution\": \"{}\"}}",
+            "{{\"Instance\": \"{}\", \"Time\": \"{:.2}\", \"Result\": {:.2}, \"Solution\": \"0 {}\"}}",
             self.instance_name,
             self.compute_time.as_secs_f64(),
             self.cost,
